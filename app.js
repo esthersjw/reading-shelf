@@ -242,13 +242,16 @@ function openBook(book) {
     html += '</section>';
   });
 
-  // End
-  html += `<section class="book-section end-section"><div class="end-emoji">📖</div></section>`;
+  // End - 返回按钮
+  html += `<section class="book-section end-section"><div class="end-emoji">📖</div><button class="back-to-shelf-btn">← 返回书架</button></section>`;
 
   document.getElementById('bookScrollContent').innerHTML = html;
   document.getElementById('bookModal').classList.add('open');
   document.getElementById('bookScrollContent').scrollTop = 0;
   document.body.style.overflow = 'hidden';
+  // 绑定底部返回按钮
+  const backBtn = document.querySelector('.back-to-shelf-btn');
+  if (backBtn) backBtn.addEventListener('click', closeBook);
 }
 
 function closeBook() {
