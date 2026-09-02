@@ -519,7 +519,8 @@ body{
 .chat-welcome{
   text-align:center;padding:40px 20px;margin:auto;
 }
-.chat-welcome-icon{font-size:3rem;margin-bottom:12px}
+.chat-welcome-icon{width:72px;height:72px;border-radius:50%;margin:0 auto 12px;display:block;object-fit:cover}
+.chat-header-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px}
 .chat-welcome-title{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text)}
 .chat-welcome-desc{font-size:13px;color:var(--text-light);margin-bottom:24px;line-height:1.6}
 .chat-suggestions{display:flex;flex-direction:column;gap:8px;max-width:400px;margin:0 auto}
@@ -566,7 +567,7 @@ body{
   .chat-message{max-width:88%}
   .chat-bubble{font-size:13px;padding:10px 14px}
   .chat-welcome{padding:24px 12px}
-  .chat-welcome-icon{font-size:2.5rem}
+  .chat-welcome-icon{width:56px;height:56px}
   .chat-welcome-title{font-size:16px}
   .chat-welcome-desc{font-size:12px}
   .chat-suggestion{font-size:12px;padding:8px 14px}
@@ -615,7 +616,7 @@ body{
   <div class="header-tabs">
     <button class="tab-btn active" data-tab="shelf">📖 书架</button>
     <button class="tab-btn" data-tab="network">🕸️ 观点网络</button>
-    <button class="tab-btn" id="chatTabBtn" data-tab="chat" style="display:none">🤖 知识问答</button>
+    <button class="tab-btn" id="chatTabBtn" data-tab="chat" style="display:none">💬 知识问答</button>
     <button class="add-book-btn" id="addBookBtn" style="display:none">+ 添加新书</button>
   </div>
 </header>
@@ -632,7 +633,7 @@ body{
   <div id="tab-chat" class="tab-content">
     <div class="chat-container">
       <div class="chat-header">
-        <span>🤖 知识问答</span>
+        <span><img src="./chat-avatar.png" class="chat-header-avatar" alt="avatar"> 知识问答</span>
         <button id="chatClearBtn" class="chat-clear-btn">清空对话</button>
       </div>
       <div class="chat-messages" id="chatMessages"></div>

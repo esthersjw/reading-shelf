@@ -474,7 +474,7 @@ function showChatWelcome() {
   if (chatMessages.length === 0) {
     welcome.innerHTML = `
       <div class="chat-welcome">
-        <div class="chat-welcome-icon">🤖</div>
+        <img src="./chat-avatar.png" class="chat-welcome-icon" alt="avatar">
         <div class="chat-welcome-title">知识问答助手</div>
         <div class="chat-welcome-desc">基于书架中 ${DATA.books.length} 本书、${DATA.insights.length} 个核心观点，帮你分析问题和寻找答案</div>
         <div class="chat-suggestions">
