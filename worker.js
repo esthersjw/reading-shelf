@@ -304,7 +304,7 @@ async function callGLM(env, messages, temperature = 0.7) {
       'Authorization': `Bearer ${env.GLM_API_KEY}`
     },
     body: JSON.stringify({
-      model: 'glm-4-plus',
+      model: 'glm-4-flash',
       messages,
       temperature
     })
