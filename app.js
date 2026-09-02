@@ -553,7 +553,11 @@ async function sendChatMessage() {
     appendChatMessage('assistant', reply);
   } catch (e) {
     typingEl.remove();
-    appendChatMessage('assistant', '抱歉，出了点问题：' + e.message);
+    let errMsg = e.message || '未知错误';
+    if (errMsg === 'Failed to fetch') {
+      errMsg = '网络连接失败，可能是 Worker 不可用或请求超时，请稍后重试';
+    }
+    appendChatMessage('assistant', '抱歉，出了点问题：' + errMsg);
   }
 }
 

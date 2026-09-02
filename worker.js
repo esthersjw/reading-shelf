@@ -211,6 +211,21 @@ async function handleAnalyzeBook(request, env) {
 }
 
 // ===== Chat =====
+// Cache data.json in memory (Workers keep state per isolate)
+let cachedData = null;
+let cachedDataTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedData(env) {
+  const now = Date.now();
+  if (cachedData && (now - cachedDataTime) < CACHE_TTL) {
+    return cachedData;
+  }
+  cachedData = await fetchGitHubData(env);
+  cachedDataTime = now;
+  return cachedData;
+}
+
 async function handleChat(request, env) {
   if (!checkAuth(request, env)) {
     return jsonResponse({ error: 'Unauthorized' }, 401);
@@ -221,8 +236,13 @@ async function handleChat(request, env) {
     return jsonResponse({ error: '消息不能为空' }, 400);
   }
 
-  // 1. Fetch current data.json for knowledge context
-  const data = await fetchGitHubData(env);
+  // 1. Fetch data.json (cached for 5 min)
+  let data;
+  try {
+    data = await getCachedData(env);
+  } catch (e) {
+    return jsonResponse({ error: '数据加载失败: ' + e.message }, 500);
+  }
 
   // 2. Build system prompt with all book knowledge
   const systemPrompt = buildChatSystemPrompt(data);
@@ -252,47 +272,27 @@ function buildChatSystemPrompt(data) {
   books.forEach(book => {
     const bookInsights = insightsByBook[book.bookId] || [];
     if (bookInsights.length === 0) return;
-    knowledge += `\n## 《${book.title}》 | 作者：${book.author || '未知'} | 分类：${book.category}\n`;
-    if (book.verdict) knowledge += `一句话评价：${book.verdict}\n`;
-
-    const chapters = {};
+    knowledge += `\n《${book.title}》(${book.category})：`;
+    if (book.verdict) knowledge += `${book.verdict}\n`;
     bookInsights.forEach(ins => {
-      // Find which chapter this insight belongs to
-      const ch = (book.chapters || []).find(c =>
-        (c.insights || []).some(i => i.id === ins.id)
-      );
-      const chName = ch ? ch.chapterName : '核心观点';
-      if (!chapters[chName]) chapters[chName] = [];
-      chapters[chName].push(ins);
-    });
-
-    Object.entries(chapters).forEach(([chName, chInsights]) => {
-      knowledge += `### ${chName}\n`;
-      chInsights.forEach(ins => {
-        knowledge += `- 【观点】${ins.point}\n`;
-        knowledge += `  解释：${ins.explanation || ''}\n`;
-        if (ins.example) knowledge += `  例子：${ins.example}\n`;
-        if (ins.keywords && ins.keywords.length) {
-          knowledge += `  关键词：${ins.keywords.join('、')}\n`;
-        }
-      });
+      knowledge += `- ${ins.point}`;
+      if (ins.explanation) knowledge += ` — ${ins.explanation.slice(0, 60)}`;
+      if (ins.keywords && ins.keywords.length) {
+        knowledge += ` [${ins.keywords.join('、')}]`;
+      }
+      knowledge += '\n';
     });
   });
 
-  return `你是「不二的书架」AI 知识助手。你的任务是基于书架中收录的书籍和核心观点，回答用户的问题，帮助用户分析和解决他们遇到的问题。
-
-以下是书架中收录的所有书籍和核心观点：
+  return `你是「不二的书架」AI 知识助手。基于书架中的书籍和核心观点回答问题。
 
 ${knowledge}
 
 回答规则：
-1. 优先基于上述书架中的知识点进行分析和回答
-2. 引用观点时标注来源，格式为 📖《书名》
-3. 可以串联多本书的观点来综合分析一个问题
-4. 如果用户描述了一个具体问题，尝试从书架中找到最相关的观点来回应
-5. 如果书架中没有直接相关的内容，可以给出一般性建议，但要说明这不是来自书架的知识
-6. 回答用中文，保持简洁有洞察力，避免空泛的说教
-7. 如果用户的问题涉及多个方面，分点回答`;
+1. 优先基于上述书架中的知识点回答，引用时标注 📖《书名》
+2. 可以串联多本书的观点综合分析
+3. 如书架无相关内容，可给一般建议但需说明
+4. 中文回答，简洁有洞察力`;
 }
 
 // ===== GLM API =====
