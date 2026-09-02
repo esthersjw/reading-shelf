@@ -501,6 +501,18 @@ body{
 .chat-message.assistant .chat-bubble{
   background:#f5f3ee;color:var(--text);border-bottom-left-radius:4px;
 }
+.chat-bubble-wrapper{position:relative}
+.chat-copy-btn{
+  position:absolute;top:-8px;right:-8px;
+  padding:3px 10px;border-radius:14px;
+  border:1px solid rgba(0,0,0,.1);background:#fff;
+  cursor:pointer;font-size:11px;color:var(--text-secondary);
+  font-family:inherit;transition:all .2s;opacity:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);z-index:1;
+}
+.chat-message.assistant:hover .chat-copy-btn{opacity:1}
+.chat-copy-btn:hover{border-color:var(--blue);color:var(--blue)}
+.chat-copy-btn.copied{background:var(--blue);color:#fff;border-color:var(--blue)}
 .chat-book-link{
   color:var(--blue) !important;text-decoration:underline;cursor:pointer;font-weight:500;
 }
@@ -561,6 +573,7 @@ body{
   .chat-input-area{padding:10px 12px;gap:8px}
   .chat-input{font-size:13px;padding:8px 12px}
   .chat-send-btn{padding:8px 14px;font-size:13px}
+  .chat-copy-btn{opacity:1}
 }
 </style>
 

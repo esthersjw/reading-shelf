@@ -595,11 +595,33 @@ function appendChatMessage(role, content) {
         if (book) openBook(book);
       });
     });
+
+    // Copy button
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-bubble-wrapper';
+    wrapper.appendChild(bubble);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'chat-copy-btn';
+    copyBtn.textContent = '复制';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(content).then(() => {
+        copyBtn.textContent = '已复制';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = '复制';
+          copyBtn.classList.remove('copied');
+        }, 2000);
+      });
+    });
+    wrapper.appendChild(copyBtn);
+
+    msgEl.appendChild(wrapper);
   } else {
     bubble.textContent = content;
+    msgEl.appendChild(bubble);
   }
 
-  msgEl.appendChild(bubble);
   container.appendChild(msgEl);
   scrollToChatBottom();
 }
