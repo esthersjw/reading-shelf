@@ -272,27 +272,50 @@ function buildChatSystemPrompt(data) {
   books.forEach(book => {
     const bookInsights = insightsByBook[book.bookId] || [];
     if (bookInsights.length === 0) return;
-    knowledge += `\n《${book.title}》(${book.category})：`;
-    if (book.verdict) knowledge += `${book.verdict}\n`;
+    knowledge += `\n## 《${book.title}》 | 作者：${book.author || '未知'} | 分类：${book.category}\n`;
+    if (book.tags && book.tags.length) {
+      knowledge += `标签：${book.tags.join('、')}\n`;
+    }
+    if (book.verdict) knowledge += `评价：${book.verdict}\n`;
+    if (book.highlights) knowledge += `高光：${book.highlights}\n`;
+
+    const chapters = {};
     bookInsights.forEach(ins => {
-      knowledge += `- ${ins.point}`;
-      if (ins.explanation) knowledge += ` — ${ins.explanation.slice(0, 60)}`;
-      if (ins.keywords && ins.keywords.length) {
-        knowledge += ` [${ins.keywords.join('、')}]`;
-      }
-      knowledge += '\n';
+      const ch = (book.chapters || []).find(c =>
+        (c.insights || []).some(i => i.id === ins.id)
+      );
+      const chName = ch ? ch.chapterName : '核心观点';
+      if (!chapters[chName]) chapters[chName] = [];
+      chapters[chName].push(ins);
+    });
+
+    Object.entries(chapters).forEach(([chName, chInsights]) => {
+      knowledge += `### ${chName}\n`;
+      chInsights.forEach(ins => {
+        knowledge += `- 观点：${ins.point}\n`;
+        if (ins.explanation) knowledge += `  解释：${ins.explanation}\n`;
+        if (ins.example) knowledge += `  例子：${ins.example}\n`;
+        if (ins.keywords && ins.keywords.length) {
+          knowledge += `  关键词：${ins.keywords.join('、')}\n`;
+        }
+      });
     });
   });
 
-  return `你是「不二的书架」AI 知识助手。基于书架中的书籍和核心观点回答问题。
+  return `你是「不二的书架」AI 知识助手。你的任务是基于书架中收录的书籍和核心观点，回答用户的问题，帮助用户分析和解决他们遇到的问题。
+
+以下是书架中收录的所有书籍和核心观点：
 
 ${knowledge}
 
 回答规则：
-1. 优先基于上述书架中的知识点回答，引用时标注 📖《书名》
-2. 可以串联多本书的观点综合分析
-3. 如书架无相关内容，可给一般建议但需说明
-4. 中文回答，简洁有洞察力`;
+1. 优先基于上述书架中的知识点进行分析和回答
+2. 引用观点时标注来源，格式为 📖《书名》
+3. 可以串联多本书的观点来综合分析一个问题
+4. 如果用户描述了一个具体问题，尝试从书架中找到最相关的观点来回应
+5. 如果书架中没有直接相关的内容，可以给出一般性建议，但要说明这不是来自书架的知识
+6. 回答用中文，保持简洁有洞察力，避免空泛的说教
+7. 如果用户的问题涉及多个方面，分点回答`;
 }
 
 // ===== GLM API =====
