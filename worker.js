@@ -221,6 +221,20 @@ async function getCachedData(env) {
   if (cachedData && (now - cachedDataTime) < CACHE_TTL) {
     return cachedData;
   }
+  // Try jsDelivr CDN first (faster, more reliable from Cloudflare network)
+  // Fallback to GitHub raw if jsDelivr fails
+  try {
+    const jsdelivrUrl = `https://cdn.jsdelivr.net/gh/${env.GITHUB_OWNER}/${env.GITHUB_REPO}@${env.GITHUB_BRANCH || 'main'}/${env.GITHUB_PATH || 'data.json'}`;
+    const res = await fetch(jsdelivrUrl, { cf: { cacheTtl: 60 } });
+    if (res.ok) {
+      cachedData = await res.json();
+      cachedDataTime = now;
+      return cachedData;
+    }
+  } catch (e) {
+    console.log('jsDelivr fetch failed, falling back to GitHub raw');
+  }
+  // Fallback
   cachedData = await fetchGitHubData(env);
   cachedDataTime = now;
   return cachedData;
@@ -240,12 +254,15 @@ async function handleChat(request, env) {
   let data;
   try {
     data = await getCachedData(env);
+    console.log('Data loaded:', data.books?.length, 'books,', data.insights?.length, 'insights');
   } catch (e) {
+    console.error('Data load error:', e.message);
     return jsonResponse({ error: '数据加载失败: ' + e.message }, 500);
   }
 
   // 2. Build system prompt with all book knowledge
   const systemPrompt = buildChatSystemPrompt(data);
+  console.log('System prompt length:', systemPrompt.length, 'chars');
 
   // 3. Call GLM with full conversation history
   const allMessages = [
@@ -253,7 +270,13 @@ async function handleChat(request, env) {
     ...messages
   ];
 
-  const reply = await callGLM(env, allMessages, 0.7);
+  let reply;
+  try {
+    reply = await callGLM(env, allMessages, 0.7);
+  } catch (e) {
+    console.error('GLM error:', e.message);
+    return jsonResponse({ error: 'AI回复失败: ' + e.message }, 500);
+  }
 
   return jsonResponse({ reply });
 }
@@ -272,33 +295,23 @@ function buildChatSystemPrompt(data) {
   books.forEach(book => {
     const bookInsights = insightsByBook[book.bookId] || [];
     if (bookInsights.length === 0) return;
-    knowledge += `\n## 《${book.title}》 | 作者：${book.author || '未知'} | 分类：${book.category}\n`;
-    if (book.tags && book.tags.length) {
-      knowledge += `标签：${book.tags.join('、')}\n`;
-    }
+    knowledge += `\n《${book.title}》(${book.category})`;
+    if (book.tags && book.tags.length) knowledge += ` [${book.tags.join('、')}]`;
+    knowledge += '\n';
     if (book.verdict) knowledge += `评价：${book.verdict}\n`;
     if (book.highlights) knowledge += `高光：${book.highlights}\n`;
-
-    const chapters = {};
     bookInsights.forEach(ins => {
-      const ch = (book.chapters || []).find(c =>
-        (c.insights || []).some(i => i.id === ins.id)
-      );
-      const chName = ch ? ch.chapterName : '核心观点';
-      if (!chapters[chName]) chapters[chName] = [];
-      chapters[chName].push(ins);
-    });
-
-    Object.entries(chapters).forEach(([chName, chInsights]) => {
-      knowledge += `### ${chName}\n`;
-      chInsights.forEach(ins => {
-        knowledge += `- 观点：${ins.point}\n`;
-        if (ins.explanation) knowledge += `  解释：${ins.explanation}\n`;
-        if (ins.example) knowledge += `  例子：${ins.example}\n`;
-        if (ins.keywords && ins.keywords.length) {
-          knowledge += `  关键词：${ins.keywords.join('、')}\n`;
-        }
-      });
+      knowledge += `- ${ins.point}`;
+      if (ins.explanation) {
+        const exp = ins.explanation.length > 200
+          ? ins.explanation.slice(0, 200) + '…'
+          : ins.explanation;
+        knowledge += ` — ${exp}`;
+      }
+      if (ins.keywords && ins.keywords.length) {
+        knowledge += ` [${ins.keywords.join('、')}]`;
+      }
+      knowledge += '\n';
     });
   });
 
@@ -319,27 +332,35 @@ ${knowledge}
 }
 
 // ===== GLM API =====
-async function callGLM(env, messages, temperature = 0.7) {
-  const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.GLM_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'glm-4-flash',
-      messages,
-      temperature
-    })
-  });
+async function callGLM(env, messages, temperature = 0.7, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.GLM_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'glm-4-flash',
+        messages,
+        temperature
+      })
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      const data = await response.json();
+      return data.choices[0].message.content;
+    }
+
+    // 429 rate limit — wait and retry
+    if (response.status === 429 && attempt < retries) {
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+      continue;
+    }
+
     const errText = await response.text();
     throw new Error(`GLM API错误 (${response.status}): ${errText}`);
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
 
 // ===== GitHub API =====
